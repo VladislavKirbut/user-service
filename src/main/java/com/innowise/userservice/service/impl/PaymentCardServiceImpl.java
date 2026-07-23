@@ -73,7 +73,7 @@ public class PaymentCardServiceImpl implements PaymentCardService {
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public Page<PaymentCardResponse> getAll(Pageable pageable) {
 
         return paymentCardRepository.findAll(pageable)
