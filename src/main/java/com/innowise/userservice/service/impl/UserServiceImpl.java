@@ -13,8 +13,10 @@ import com.innowise.userservice.service.UserService;
 import com.innowise.userservice.specification.UserSpecification;
 import com.innowise.userservice.util.CacheNames;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -38,7 +40,13 @@ public class UserServiceImpl implements UserService {
 
         User user = userMapper.toEntity(request);
 
-        return userMapper.toResponse(userRepository.save(user));
+        try {
+            User savedUser = userRepository.save(user);
+
+            return userMapper.toResponse(savedUser);
+        } catch (DataIntegrityViolationException ex) {
+            throw new EmailAlreadyExistsException(request.email());
+        }
     }
 
     @Cacheable(value = CacheNames.USERS, key = "#id")
@@ -49,6 +57,15 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new UserNotFoundException(id));
 
         return userMapper.toDetailsResponse(user);
+    }
+
+    @Override
+    public UserResponse getByEmail(String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException(email));
+
+        return userMapper.toResponse(user);
     }
 
     @Override

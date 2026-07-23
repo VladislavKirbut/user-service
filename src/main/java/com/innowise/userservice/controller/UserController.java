@@ -37,6 +37,12 @@ public class UserController {
         return ResponseEntity.ok(userService.getById(id));
     }
 
+    @GetMapping("/by-email")
+    public ResponseEntity<UserResponse> getByEmail(@RequestParam String email) {
+
+        return ResponseEntity.ok(userService.getByEmail(email));
+    }
+
     @GetMapping
     public ResponseEntity<Page<UserResponse>> getAll(
             @RequestParam(required = false) String name,

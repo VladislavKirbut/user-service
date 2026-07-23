@@ -8,4 +8,4 @@ CREATE INDEX idx_users_surname
 ON users(surname);
 
 CREATE INDEX idx_payment_cards_user_active
-ON payment_cards(user_id, active);
+ON payment_cards(user_id);
