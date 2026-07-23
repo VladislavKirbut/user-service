@@ -11,7 +11,7 @@ import com.innowise.userservice.mapper.UserMapper;
 import com.innowise.userservice.repository.UserRepository;
 import com.innowise.userservice.service.UserService;
 import com.innowise.userservice.specification.UserSpecification;
-import com.innowise.userservice.util.CacheNames;
+import com.innowise.userservice.service.util.CacheNames;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -38,13 +38,16 @@ public class UserServiceImpl implements UserService {
 
         User user = userMapper.toEntity(request);
 
-        return userMapper.toResponse(userRepository.save(user));
+        User savedUser = userRepository.save(user);
+
+        return userMapper.toResponse(savedUser);
     }
 
+    @Override
     @Cacheable(value = CacheNames.USERS, key = "#id")
     @Transactional(readOnly = true)
-    @Override
     public UserDetailsResponse getById(Long id) {
+
         User user = userRepository.findWithPaymentCardsById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
 
@@ -59,14 +62,13 @@ public class UserServiceImpl implements UserService {
                 .where(UserSpecification.hasName(name))
                 .and(UserSpecification.hasSurname(surname));
 
-        Page<User> users = userRepository.findAll(specification, pageable);
-
-        return users.map(userMapper::toResponse);
+        return userRepository.findAll(specification, pageable)
+                .map(userMapper::toResponse);
     }
 
-    @CacheEvict(value = CacheNames.USERS, key = "#id")
-    @Transactional
     @Override
+    @Transactional
+    @CacheEvict(value = CacheNames.USERS, key = "#id")
     public UserResponse update(Long id, UpdateUserRequest request) {
 
         User user = userRepository.findById(id)
@@ -81,26 +83,28 @@ public class UserServiceImpl implements UserService {
         return userMapper.toResponse(user);
     }
 
-    @CacheEvict(value = CacheNames.USERS, key = "#id")
-    @Transactional
     @Override
-    public void activate(Long id) {
+    @Transactional
+    @CacheEvict(value = CacheNames.USERS, key = "#id")
+    public void updateActiveStatus(Long id, boolean active) {
 
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException(id));
+        if (!userRepository.existsById(id)) {
+            throw new UserNotFoundException(id);
+        }
 
-        user.setActive(true);
+        userRepository.updateActive(id, active);
     }
 
-    @CacheEvict(value = CacheNames.USERS, key = "#id")
-    @Transactional
     @Override
-    public void deactivate(Long id) {
+    @Transactional
+    @CacheEvict(value = CacheNames.USERS, key = "#id")
+    public void delete(Long id) {
 
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException(id));
+        if (!userRepository.existsById(id)) {
+            throw new UserNotFoundException(id);
+        }
 
-        user.setActive(false);
+        userRepository.deleteById(id);
     }
 
 }

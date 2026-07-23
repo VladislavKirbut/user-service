@@ -1,10 +1,8 @@
 package com.innowise.userservice.exception.handler;
 
 import com.innowise.userservice.dto.response.ErrorResponse;
-import com.innowise.userservice.exception.CardLimitExceededException;
-import com.innowise.userservice.exception.EmailAlreadyExistsException;
-import com.innowise.userservice.exception.PaymentCardNotFoundException;
-import com.innowise.userservice.exception.UserNotFoundException;
+import com.innowise.userservice.dto.response.ValidationErrorResponse;
+import com.innowise.userservice.exception.*;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,12 +11,20 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleUnexpectedExceptions(
+            Exception ex,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error", request);
+    }
 
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleUserNotFound(
@@ -47,6 +53,15 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
+    @ExceptionHandler(PaymentCardAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentCardAlreadyExists(
+            PaymentCardAlreadyExistsException ex,
+            HttpServletRequest request
+    ) {
+
+        return buildResponse(HttpStatus.CONFLICT, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(CardLimitExceededException.class)
     public ResponseEntity<ErrorResponse> handleCardLimitExceeded(
             CardLimitExceededException ex,
@@ -57,8 +72,9 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidation(
-            MethodArgumentNotValidException ex
+    public ResponseEntity<ValidationErrorResponse> handleValidation(
+            MethodArgumentNotValidException ex,
+            HttpServletRequest request
     ) {
 
         Map<String, String> errors = new LinkedHashMap<>();
@@ -68,9 +84,16 @@ public class GlobalExceptionHandler {
                 .getFieldErrors()
                 .forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
 
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(errors);
+        ValidationErrorResponse response = ValidationErrorResponse.builder()
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+                .message("Request validation failed")
+                .path(request.getRequestURI())
+                .timestamp(LocalDateTime.now())
+                .errors(errors)
+                .build();
+
+        return ResponseEntity.badRequest().body(response);
     }
 
     private ResponseEntity<ErrorResponse> buildResponse(

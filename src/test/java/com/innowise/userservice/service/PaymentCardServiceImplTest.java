@@ -23,13 +23,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
 
 import static com.innowise.userservice.testdata.PaymentCardTestConstants.*;
 import static com.innowise.userservice.testdata.UserTestConstants.*;
-import static com.innowise.userservice.testdata.UserTestConstants.ACTIVE;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -65,7 +65,7 @@ class PaymentCardServiceImplTest {
                 .id(USER_ID)
                 .name(USER_NAME)
                 .surname(USER_SURNAME)
-                .email(OLD_EMAIL)
+                .email(EMAIL)
                 .birthDate(USER_BIRTH_DATE)
                 .active(ACTIVE)
                 .build();
@@ -107,7 +107,7 @@ class PaymentCardServiceImplTest {
         void shouldCreateCardSuccessfully() {
 
             when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-            when(paymentCardRepository.countByUserIdAndActiveTrue(USER_ID)).thenReturn(MIN_COUNT_CARD);
+            when(paymentCardRepository.countByUserId(USER_ID)).thenReturn(MIN_COUNT_CARD);
             when(paymentCardMapper.toEntity(createRequest)).thenReturn(paymentCard);
             when(paymentCardRepository.save(paymentCard)).thenReturn(paymentCard);
             when(paymentCardMapper.toResponse(paymentCard)).thenReturn(paymentCardResponse);
@@ -116,15 +116,14 @@ class PaymentCardServiceImplTest {
 
             assertThat(result).isEqualTo(paymentCardResponse);
 
-            verify(userRepository).findById(USER_ID);
-            verify(paymentCardRepository).countByUserIdAndActiveTrue(USER_ID);
-            verify(paymentCardMapper).toEntity(createRequest);
-            verify(paymentCardRepository).save(paymentCard);
-            verify(paymentCardMapper).toResponse(paymentCard);
-
             assertThat(paymentCard.getUser()).isEqualTo(user);
             assertThat(user.getPaymentCards()).contains(paymentCard);
 
+            verify(userRepository).findById(USER_ID);
+            verify(paymentCardRepository).countByUserId(USER_ID);
+            verify(paymentCardMapper).toEntity(createRequest);
+            verify(paymentCardRepository).save(paymentCard);
+            verify(paymentCardMapper).toResponse(paymentCard);
             verifyNoMoreInteractions(userRepository, paymentCardRepository, paymentCardMapper);
         }
 
@@ -146,14 +145,15 @@ class PaymentCardServiceImplTest {
         void shouldThrowExceptionWhenCardLimitExceeded() {
 
             when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-            when(paymentCardRepository.countByUserIdAndActiveTrue(USER_ID)).thenReturn(MAX_COUNT_CARD);
+            when(paymentCardRepository.countByUserId(USER_ID)).thenReturn(MAX_COUNT_CARD);
 
             assertThatThrownBy(() -> paymentCardService.create(USER_ID, createRequest))
                     .isInstanceOf(CardLimitExceededException.class)
-                    .hasMessage("User with id: " + USER_ID + " already has the maximum number of payment cards");
+                    .hasMessage("User with id: " + USER_ID
+                            + " already has the maximum number of payment cards");
 
             verify(userRepository).findById(USER_ID);
-            verify(paymentCardRepository).countByUserIdAndActiveTrue(USER_ID);
+            verify(paymentCardRepository).countByUserId(USER_ID);
             verifyNoInteractions(paymentCardMapper);
             verifyNoMoreInteractions(userRepository, paymentCardRepository);
         }
@@ -165,14 +165,16 @@ class PaymentCardServiceImplTest {
         @Test
         void shouldReturnPaymentCardById() {
 
-            when(paymentCardRepository.findById(CARD_ID)).thenReturn(Optional.of(paymentCard));
-            when(paymentCardMapper.toResponse(paymentCard)).thenReturn(paymentCardResponse);
+            when(paymentCardRepository.findByIdAndUserId(CARD_ID, USER_ID))
+                    .thenReturn(Optional.of(paymentCard));
+            when(paymentCardMapper.toResponse(paymentCard))
+                    .thenReturn(paymentCardResponse);
 
-            PaymentCardResponse result = paymentCardService.getById(CARD_ID);
+            PaymentCardResponse result = paymentCardService.getById(CARD_ID, USER_ID);
 
             assertThat(result).isEqualTo(paymentCardResponse);
 
-            verify(paymentCardRepository).findById(CARD_ID);
+            verify(paymentCardRepository).findByIdAndUserId(CARD_ID, USER_ID);
             verify(paymentCardMapper).toResponse(paymentCard);
             verifyNoMoreInteractions(paymentCardRepository, paymentCardMapper);
             verifyNoInteractions(userRepository);
@@ -181,29 +183,33 @@ class PaymentCardServiceImplTest {
         @Test
         void shouldThrowExceptionWhenPaymentCardNotFound() {
 
-            when(paymentCardRepository.findById(CARD_ID)).thenReturn(Optional.empty());
+            when(paymentCardRepository.findByIdAndUserId(CARD_ID, USER_ID))
+                    .thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> paymentCardService.getById(CARD_ID))
+            assertThatThrownBy(() -> paymentCardService.getById(CARD_ID, USER_ID))
                     .isInstanceOf(PaymentCardNotFoundException.class)
-                    .hasMessage("Payment card with id " + CARD_ID + " not found");
+                    .hasMessage("Payment card with id: " + CARD_ID + " not found");
 
-            verify(paymentCardRepository).findById(CARD_ID);
+            verify(paymentCardRepository).findByIdAndUserId(CARD_ID, USER_ID);
             verifyNoInteractions(paymentCardMapper, userRepository);
             verifyNoMoreInteractions(paymentCardRepository);
         }
     }
 
     @Nested
-    class GetByUserIdTests {
+    class GetAllByUserIdTests {
 
         @Test
-        void shouldReturnPaymentCardsByUserId() {
+        void shouldReturnAllPaymentCardsByUserId() {
 
             when(userRepository.existsById(USER_ID)).thenReturn(true);
-            when(paymentCardRepository.findAllByUserId(USER_ID)).thenReturn(List.of(paymentCard));
-            when(paymentCardMapper.toResponse(paymentCard)).thenReturn(paymentCardResponse);
+            when(paymentCardRepository.findAllByUserId(USER_ID))
+                    .thenReturn(List.of(paymentCard));
+            when(paymentCardMapper.toResponse(paymentCard))
+                    .thenReturn(paymentCardResponse);
 
-            List<PaymentCardResponse> result = paymentCardService.getByUserId(USER_ID);
+            List<PaymentCardResponse> result =
+                    paymentCardService.getAllByUserId(USER_ID, null);
 
             assertThat(result)
                     .hasSize(1)
@@ -212,6 +218,31 @@ class PaymentCardServiceImplTest {
             verify(userRepository).existsById(USER_ID);
             verify(paymentCardRepository).findAllByUserId(USER_ID);
             verify(paymentCardMapper).toResponse(paymentCard);
+            verify(paymentCardRepository, never())
+                    .findAllByUserIdAndActive(anyLong(), anyBoolean());
+            verifyNoMoreInteractions(userRepository, paymentCardRepository, paymentCardMapper);
+        }
+
+        @Test
+        void shouldReturnPaymentCardsFilteredByActiveStatus() {
+
+            when(userRepository.existsById(USER_ID)).thenReturn(true);
+            when(paymentCardRepository.findAllByUserIdAndActive(USER_ID, true))
+                    .thenReturn(List.of(paymentCard));
+            when(paymentCardMapper.toResponse(paymentCard))
+                    .thenReturn(paymentCardResponse);
+
+            List<PaymentCardResponse> result =
+                    paymentCardService.getAllByUserId(USER_ID, true);
+
+            assertThat(result)
+                    .hasSize(1)
+                    .containsExactly(paymentCardResponse);
+
+            verify(userRepository).existsById(USER_ID);
+            verify(paymentCardRepository).findAllByUserIdAndActive(USER_ID, true);
+            verify(paymentCardMapper).toResponse(paymentCard);
+            verify(paymentCardRepository, never()).findAllByUserId(anyLong());
             verifyNoMoreInteractions(userRepository, paymentCardRepository, paymentCardMapper);
         }
 
@@ -219,9 +250,11 @@ class PaymentCardServiceImplTest {
         void shouldReturnEmptyListWhenUserHasNoCards() {
 
             when(userRepository.existsById(USER_ID)).thenReturn(true);
-            when(paymentCardRepository.findAllByUserId(USER_ID)).thenReturn(List.of());
+            when(paymentCardRepository.findAllByUserId(USER_ID))
+                    .thenReturn(List.of());
 
-            List<PaymentCardResponse> result = paymentCardService.getByUserId(USER_ID);
+            List<PaymentCardResponse> result =
+                    paymentCardService.getAllByUserId(USER_ID, null);
 
             assertThat(result).isEmpty();
 
@@ -236,7 +269,7 @@ class PaymentCardServiceImplTest {
 
             when(userRepository.existsById(USER_ID)).thenReturn(false);
 
-            assertThatThrownBy(() -> paymentCardService.getByUserId(USER_ID))
+            assertThatThrownBy(() -> paymentCardService.getAllByUserId(USER_ID, null))
                     .isInstanceOf(UserNotFoundException.class)
                     .hasMessage("User with id: " + USER_ID + " not found");
 
@@ -253,21 +286,42 @@ class PaymentCardServiceImplTest {
         void shouldReturnPageOfPaymentCards() {
 
             Pageable pageable = PageRequest.of(0, 10);
-
             Page<PaymentCard> page = new PageImpl<>(List.of(paymentCard));
 
-            when(paymentCardRepository.findAll(pageable)).thenReturn(page);
-            when(paymentCardMapper.toResponse(paymentCard)).thenReturn(paymentCardResponse);
+            when(paymentCardRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
+            when(paymentCardMapper.toResponse(paymentCard))
+                    .thenReturn(paymentCardResponse);
 
-            Page<PaymentCardResponse> result = paymentCardService.getAll(pageable);
+            Page<PaymentCardResponse> result =
+                    paymentCardService.getAll(USER_NAME, USER_SURNAME, CARD_ACTIVE, pageable);
 
-            assertThat(result).hasSize(1);
-            assertThat(result.getContent()).containsExactly(paymentCardResponse);
+            assertThat(result)
+                    .hasSize(1)
+                    .containsExactly(paymentCardResponse);
 
-            verify(paymentCardRepository).findAll(pageable);
+            verify(paymentCardRepository).findAll(any(Specification.class), eq(pageable));
             verify(paymentCardMapper).toResponse(paymentCard);
             verifyNoInteractions(userRepository);
             verifyNoMoreInteractions(paymentCardRepository, paymentCardMapper);
+        }
+
+        @Test
+        void shouldReturnEmptyPageWhenNoPaymentCardsFound() {
+
+            Pageable pageable = PageRequest.of(0, 10);
+            Page<PaymentCard> emptyPage = Page.empty(pageable);
+
+            when(paymentCardRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(emptyPage);
+
+            Page<PaymentCardResponse> result =
+                    paymentCardService.getAll(null, null, null, pageable);
+
+            assertThat(result).isEmpty();
+            assertThat(result.getTotalElements()).isZero();
+
+            verify(paymentCardRepository).findAll(any(Specification.class), eq(pageable));
+            verifyNoInteractions(paymentCardMapper, userRepository);
+            verifyNoMoreInteractions(paymentCardRepository);
         }
     }
 
@@ -277,14 +331,17 @@ class PaymentCardServiceImplTest {
         @Test
         void shouldUpdatePaymentCardSuccessfully() {
 
-            when(paymentCardRepository.findById(CARD_ID)).thenReturn(Optional.of(paymentCard));
-            when(paymentCardMapper.toResponse(paymentCard)).thenReturn(paymentCardResponse);
+            when(paymentCardRepository.findByIdAndUserId(CARD_ID, USER_ID))
+                    .thenReturn(Optional.of(paymentCard));
+            when(paymentCardMapper.toResponse(paymentCard))
+                    .thenReturn(paymentCardResponse);
 
-            PaymentCardResponse result = paymentCardService.update(CARD_ID, updateRequest);
+            PaymentCardResponse result =
+                    paymentCardService.update(CARD_ID, USER_ID, updateRequest);
 
             assertThat(result).isEqualTo(paymentCardResponse);
 
-            verify(paymentCardRepository).findById(CARD_ID);
+            verify(paymentCardRepository).findByIdAndUserId(CARD_ID, USER_ID);
             verify(paymentCardMapper).updateEntity(updateRequest, paymentCard);
             verify(paymentCardMapper).toResponse(paymentCard);
             verifyNoInteractions(userRepository);
@@ -294,79 +351,85 @@ class PaymentCardServiceImplTest {
         @Test
         void shouldThrowExceptionWhenUpdatingNonExistingCard() {
 
-            when(paymentCardRepository.findById(CARD_ID)).thenReturn(Optional.empty());
+            when(paymentCardRepository.findByIdAndUserId(CARD_ID, USER_ID))
+                    .thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> paymentCardService.update(CARD_ID, updateRequest))
+            assertThatThrownBy(() ->
+                    paymentCardService.update(CARD_ID, USER_ID, updateRequest))
                     .isInstanceOf(PaymentCardNotFoundException.class)
-                    .hasMessage("Payment card with id " + CARD_ID + " not found");
+                    .hasMessage("Payment card with id: " + CARD_ID + " not found");
 
-            verify(paymentCardRepository).findById(CARD_ID);
+            verify(paymentCardRepository).findByIdAndUserId(CARD_ID, USER_ID);
             verifyNoInteractions(userRepository, paymentCardMapper);
             verifyNoMoreInteractions(paymentCardRepository);
         }
     }
 
     @Nested
-    class ActivateTests {
+    class UpdateActiveStatusTests {
 
         @Test
-        void shouldActivatePaymentCard() {
+        void shouldUpdatePaymentCardActiveStatusSuccessfully() {
 
-            paymentCard.setActive(CARD_INACTIVE);
+            when(paymentCardRepository.findByIdAndUserId(CARD_ID, USER_ID))
+                    .thenReturn(Optional.of(paymentCard));
 
-            when(paymentCardRepository.findById(CARD_ID)).thenReturn(Optional.of(paymentCard));
+            paymentCardService.updateActiveStatus(CARD_ID, USER_ID, false);
 
-            paymentCardService.activate(CARD_ID);
-
-            assertThat(paymentCard.getActive()).isTrue();
-
-            verify(paymentCardRepository).findById(CARD_ID);
+            verify(paymentCardRepository).findByIdAndUserId(CARD_ID, USER_ID);
+            verify(paymentCardRepository).updateActiveStatus(CARD_ID, USER_ID, false);
             verifyNoInteractions(userRepository, paymentCardMapper);
             verifyNoMoreInteractions(paymentCardRepository);
         }
 
         @Test
-        void shouldThrowExceptionWhenActivatingNonExistingCard() {
+        void shouldThrowExceptionWhenUpdatingStatusOfNonExistingCard() {
 
-            when(paymentCardRepository.findById(CARD_ID)).thenReturn(Optional.empty());
+            when(paymentCardRepository.findByIdAndUserId(CARD_ID, USER_ID))
+                    .thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> paymentCardService.activate(CARD_ID))
+            assertThatThrownBy(() ->
+                    paymentCardService.updateActiveStatus(CARD_ID, USER_ID, false))
                     .isInstanceOf(PaymentCardNotFoundException.class)
-                    .hasMessage("Payment card with id " + CARD_ID + " not found");
+                    .hasMessage("Payment card with id: " + CARD_ID + " not found");
 
-            verify(paymentCardRepository).findById(CARD_ID);
-            verifyNoInteractions(paymentCardMapper, userRepository);
+            verify(paymentCardRepository).findByIdAndUserId(CARD_ID, USER_ID);
+            verify(paymentCardRepository, never())
+                    .updateActiveStatus(anyLong(), anyLong(), anyBoolean());
+            verifyNoInteractions(userRepository, paymentCardMapper);
             verifyNoMoreInteractions(paymentCardRepository);
         }
     }
 
     @Nested
-    class DeactivateTests {
+    class DeleteTests {
 
         @Test
-        void shouldDeactivatePaymentCard() {
+        void shouldDeletePaymentCardSuccessfully() {
 
-            when(paymentCardRepository.findById(CARD_ID)).thenReturn(Optional.of(paymentCard));
+            when(paymentCardRepository.findByIdAndUserId(CARD_ID, USER_ID))
+                    .thenReturn(Optional.of(paymentCard));
 
-            paymentCardService.deactivate(CARD_ID);
+            paymentCardService.delete(CARD_ID, USER_ID);
 
-            assertThat(paymentCard.getActive()).isFalse();
-
-            verify(paymentCardRepository).findById(CARD_ID);
-            verifyNoInteractions(paymentCardMapper, userRepository);
+            verify(paymentCardRepository).findByIdAndUserId(CARD_ID, USER_ID);
+            verify(paymentCardRepository).delete(paymentCard);
+            verifyNoInteractions(userRepository, paymentCardMapper);
             verifyNoMoreInteractions(paymentCardRepository);
         }
 
         @Test
-        void shouldThrowExceptionWhenDeactivatingNonExistingCard() {
+        void shouldThrowExceptionWhenDeletingNonExistingCard() {
 
-            when(paymentCardRepository.findById(CARD_ID)).thenReturn(Optional.empty());
+            when(paymentCardRepository.findByIdAndUserId(CARD_ID, USER_ID))
+                    .thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> paymentCardService.deactivate(CARD_ID))
+            assertThatThrownBy(() -> paymentCardService.delete(CARD_ID, USER_ID))
                     .isInstanceOf(PaymentCardNotFoundException.class)
-                    .hasMessage("Payment card with id " + CARD_ID + " not found");
+                    .hasMessage("Payment card with id: " + CARD_ID + " not found");
 
-            verify(paymentCardRepository).findById(CARD_ID);
+            verify(paymentCardRepository).findByIdAndUserId(CARD_ID, USER_ID);
+            verify(paymentCardRepository, never()).delete(any(PaymentCard.class));
             verifyNoInteractions(userRepository, paymentCardMapper);
             verifyNoMoreInteractions(paymentCardRepository);
         }

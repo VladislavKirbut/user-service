@@ -1,21 +1,22 @@
-server:
-  port: 8081
-
 spring:
-  application:
-    name: user-service
+  datasource:
+    driver-class-name: org.postgresql.Driver
 
   jpa:
-    hibernate:
-      ddl-auto: validate
-    open-in-view: false
+    hibernate.ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
 
-  cache:
-    type: redis
-    redis:
-      time-to-live: 10m
-      cache-null-values: false
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
 
-logging:
-  level:
-    org.hibernate.SQL: DEBUG
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+

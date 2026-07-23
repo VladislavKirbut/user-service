@@ -2,27 +2,29 @@ package com.innowise.userservice.dto.request;
 
 import jakarta.validation.constraints.*;
 import lombok.Builder;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
 
 @Builder
 public record CreateUserRequest (
 
-    @NotBlank(message = "Name cannot be blank")
-    @Size(max = 100, message = "Name length must not exceed 50 characters")
+    @NotBlank(message = "User's name is required")
+    @Size(min = 1, max = 100, message = "User's name must be between 1 and 100 characters")
     String name,
 
-    @NotBlank(message = "Surname cannot be blank")
-    @Size(max = 100, message = "Surname length must not exceed 100 characters")
+    @NotBlank(message = "Surname is required")
+    @Size(min = 1, max = 100, message = "User's surname must be between 1 and 100 characters")
     String surname,
 
-    @NotNull(message = "Birth date cannot be null")
-    @Past(message = "Birth date must be in the past")
+    @NotNull(message = "Birth date is required")
+    @Past(message = "Birth date must be a date in the past")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     LocalDate birthDate,
 
-    @NotBlank(message = "Email cannot be blank")
-    @Email(message = "Email should be valid")
-    @Size(max = 255, message = "Email length must not exceed 255 characters")
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
+    @Size(max = 255, message = "Email must not exceed 255 characters")
     String email
 
 ) {}

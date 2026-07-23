@@ -10,7 +10,6 @@ public final class PaymentCardTestConstants {
     public static final String CARD_HOLDER = "IVAN IVANOV";
 
     public static final Boolean CARD_ACTIVE = true;
-    public static final Boolean CARD_INACTIVE = false;
 
     public static final LocalDate CARD_EXPIRATION_DATE = LocalDate.of(2030, 3,5);
 

@@ -11,25 +11,25 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 @Table(name = "payment_cards")
 public class PaymentCard extends BaseEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Column(nullable = false, unique = true, length = 19)
     private String number;
 
+    @Column(nullable = false, length = 100)
     private String holder;
 
+    @Column(nullable = false)
     private LocalDate expirationDate;
 
     @Builder.Default
+    @Column(nullable = false)
     private Boolean active = true;
 
 }

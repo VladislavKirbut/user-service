@@ -11,7 +11,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import static org.springframework.http.MediaType.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -20,9 +23,8 @@ public class UserController {
 
     private final UserService userService;
 
-
-    @PostMapping
-    public ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserRequest request) {
+    @PostMapping(consumes = APPLICATION_JSON_VALUE, produces = APPLICATION_JSON_VALUE)
+    public ResponseEntity<UserResponse> createUser(@Valid @RequestBody CreateUserRequest request) {
 
         UserResponse response = userService.create(request);
 
@@ -31,14 +33,21 @@ public class UserController {
                 .body(response);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<UserDetailsResponse> getById(@PathVariable Long id) {
+    @GetMapping(value = "/me", produces = APPLICATION_JSON_VALUE)
+    public ResponseEntity<UserDetailsResponse> findCurrentUser(
+            @AuthenticationPrincipal Long userId) {
+
+        return ResponseEntity.ok(userService.getById(userId));
+    }
+
+    @GetMapping(value = "/{id}", produces = APPLICATION_JSON_VALUE)
+    public ResponseEntity<UserDetailsResponse> findUser(@PathVariable Long id) {
 
         return ResponseEntity.ok(userService.getById(id));
     }
 
-    @GetMapping
-    public ResponseEntity<Page<UserResponse>> getAll(
+    @GetMapping(produces = APPLICATION_JSON_VALUE)
+    public ResponseEntity<Page<UserResponse>> findUsers(
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String surname,
             Pageable pageable
@@ -47,8 +56,8 @@ public class UserController {
         return ResponseEntity.ok(userService.getAll(name, surname, pageable));
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<UserResponse> update(
+    @PutMapping(value = "/{id}", consumes = APPLICATION_JSON_VALUE, produces = APPLICATION_JSON_VALUE)
+    public ResponseEntity<UserResponse> updateUser(
             @PathVariable Long id,
             @Valid @RequestBody UpdateUserRequest request
     ) {
@@ -56,22 +65,32 @@ public class UserController {
         return ResponseEntity.ok(userService.update(id, request));
     }
 
-    @PatchMapping("/{id}/activate")
-    public ResponseEntity<Void> activate(
-            @PathVariable Long id
+    @PutMapping(value = "/me", consumes = APPLICATION_JSON_VALUE, produces = APPLICATION_JSON_VALUE)
+    public ResponseEntity<UserResponse> updateCurrentUser(
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody UpdateUserRequest request
     ) {
 
-        userService.activate(id);
+        return ResponseEntity.ok(userService.update(userId, request));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<Void> updateUserStatus(
+            @PathVariable Long id,
+            @RequestParam boolean active
+    ) {
+
+        userService.updateActiveStatus(id, active);
 
         return ResponseEntity.noContent().build();
     }
 
-    @PatchMapping("/{id}/deactivate")
-    public ResponseEntity<Void> deactivate(
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteUser(
             @PathVariable Long id
     ) {
 
-        userService.deactivate(id);
+        userService.delete(id);
 
         return ResponseEntity.noContent().build();
     }

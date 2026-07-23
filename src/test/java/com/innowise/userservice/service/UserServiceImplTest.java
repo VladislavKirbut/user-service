@@ -60,7 +60,7 @@ class UserServiceImplTest {
                 .id(USER_ID)
                 .name(USER_NAME)
                 .surname(USER_SURNAME)
-                .email(OLD_EMAIL)
+                .email(EMAIL)
                 .birthDate(USER_BIRTH_DATE)
                 .active(ACTIVE)
                 .build();
@@ -68,7 +68,7 @@ class UserServiceImplTest {
         createRequest = CreateUserRequest.builder()
                 .name(USER_NAME)
                 .surname(USER_SURNAME)
-                .email(OLD_EMAIL)
+                .email(EMAIL)
                 .birthDate(USER_BIRTH_DATE)
                 .build();
 
@@ -83,7 +83,7 @@ class UserServiceImplTest {
                 .id(USER_ID)
                 .name(USER_NAME)
                 .surname(USER_SURNAME)
-                .email(OLD_EMAIL)
+                .email(EMAIL)
                 .active(ACTIVE)
                 .build();
 
@@ -91,7 +91,7 @@ class UserServiceImplTest {
                 .id(USER_ID)
                 .name(USER_NAME)
                 .surname(USER_SURNAME)
-                .email(OLD_EMAIL)
+                .email(EMAIL)
                 .active(ACTIVE)
                 .birthDate(USER_BIRTH_DATE)
                 .build();
@@ -99,7 +99,7 @@ class UserServiceImplTest {
 
 
     @Nested
-    class CreateTests {
+    class CreateUserTests {
 
         @Test
         void shouldCreateUserSuccessfully() {
@@ -111,9 +111,7 @@ class UserServiceImplTest {
 
             UserResponse result = userService.create(createRequest);
 
-            assertThat(result)
-                    .isNotNull()
-                    .isEqualTo(userResponse);
+            assertThat(result).isEqualTo(userResponse);
 
             verify(userRepository).existsByEmail(createRequest.email());
             verify(userMapper).toEntity(createRequest);
@@ -171,6 +169,49 @@ class UserServiceImplTest {
     }
 
     @Nested
+    class GetAllTests {
+
+        @Test
+        void shouldReturnUsersPage() {
+
+            Pageable pageable = PageRequest.of(0, 10);
+
+            Page<User> users = new PageImpl<>(List.of(user));
+
+            when(userRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(users);
+            when(userMapper.toResponse(user)).thenReturn(userResponse);
+
+            Page<UserResponse> result = userService.getAll(USER_NAME, USER_SURNAME, pageable);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.getContent()).containsExactly(userResponse);
+
+            verify(userRepository).findAll(any(Specification.class), eq(pageable));
+            verify(userMapper).toResponse(user);
+            verifyNoMoreInteractions(userRepository, userMapper);
+        }
+
+        @Test
+        void shouldReturnEmptyPageWhenNoUsersFound() {
+
+            Pageable pageable = PageRequest.of(0, 10);
+            Page<User> emptyPage = Page.empty(pageable);
+
+            when(userRepository.findAll(any(Specification.class), eq(pageable)))
+                    .thenReturn(emptyPage);
+
+            Page<UserResponse> result = userService.getAll(USER_NAME, USER_SURNAME, pageable);
+
+            assertThat(result).isEmpty();
+            assertThat(result.getTotalElements()).isZero();
+
+            verify(userRepository).findAll(any(Specification.class), eq(pageable));
+            verifyNoInteractions(userMapper);
+            verifyNoMoreInteractions(userRepository);
+        }
+    }
+
+    @Nested
     class UpdateTests {
 
         @Test
@@ -208,21 +249,24 @@ class UserServiceImplTest {
 
         @Test
         void shouldUpdateUserWhenEmailNotChanged() {
-
-            updateRequest = updateRequest.toBuilder()
-                    .email(OLD_EMAIL)
+            UpdateUserRequest requestWithSameEmail = UpdateUserRequest.builder()
+                    .name(USER_NAME)
+                    .surname(USER_SURNAME)
+                    .birthDate(USER_BIRTH_DATE)
+                    .email(EMAIL)
                     .build();
+
 
             when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
             when(userMapper.toResponse(user)).thenReturn(userResponse);
 
-            UserResponse actualResponse = userService.update(USER_ID, updateRequest);
+            UserResponse actualResponse = userService.update(USER_ID, requestWithSameEmail);
 
             assertThat(actualResponse).isEqualTo(userResponse);
 
             verify(userRepository).findById(USER_ID);
             verify(userRepository, never()).existsByEmail(any());
-            verify(userMapper).updateUser(updateRequest, user);
+            verify(userMapper).updateUser(requestWithSameEmail, user);
             verify(userMapper).toResponse(user);
             verifyNoMoreInteractions(userRepository, userMapper);
         }
@@ -243,93 +287,63 @@ class UserServiceImplTest {
     }
 
     @Nested
-    class ActivateTests {
+    class UpdateActiveStatusTests {
 
         @Test
-        void shouldActivateUser() {
+        void shouldUpdateUserActiveStatusSuccessfully() {
+            when(userRepository.existsById(USER_ID)).thenReturn(true);
 
-            user.setActive(INACTIVE);
+            userService.updateActiveStatus(USER_ID, false);
 
-            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-
-            userService.activate(USER_ID);
-
-            assertThat(user.getActive()).isTrue();
-
-            verify(userRepository).findById(USER_ID);
-            verifyNoInteractions(userMapper);
+            verify(userRepository).existsById(USER_ID);
+            verify(userRepository).updateActive(USER_ID, false);
             verifyNoMoreInteractions(userRepository);
+            verifyNoInteractions(userMapper);
         }
 
         @Test
-        void shouldThrowExceptionWhenActivatingNonExistingUser() {
+        void shouldThrowExceptionWhenUpdatingStatusOfNonExistingUser() {
+            when(userRepository.existsById(USER_ID)).thenReturn(false);
 
-            when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> userService.activate(USER_ID))
+            assertThatThrownBy(() -> userService.updateActiveStatus(USER_ID, false))
                     .isInstanceOf(UserNotFoundException.class)
                     .hasMessage("User with id: " + USER_ID + " not found");
 
-            verify(userRepository).findById(USER_ID);
-            verifyNoInteractions(userMapper);
+            verify(userRepository).existsById(USER_ID);
+            verify(userRepository, never()).updateActive(anyLong(), anyBoolean());
             verifyNoMoreInteractions(userRepository);
+            verifyNoInteractions(userMapper);
         }
     }
 
-    @Nested
-    class DeactivateTests {
+   @Nested
+    class DeleteTests {
 
-        @Test
-        void shouldDeactivateUser() {
+       @Test
+       void shouldDeleteUserSuccessfully() {
+           when(userRepository.existsById(USER_ID)).thenReturn(true);
 
-            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+           userService.delete(USER_ID);
 
-            userService.deactivate(USER_ID);
+           verify(userRepository).existsById(USER_ID);
+           verify(userRepository).deleteById(USER_ID);
+           verifyNoMoreInteractions(userRepository);
+           verifyNoInteractions(userMapper);
+       }
 
-            assertThat(user.getActive()).isFalse();
+       @Test
+       void shouldThrowExceptionWhenDeletingNonExistingUser() {
+           when(userRepository.existsById(USER_ID)).thenReturn(false);
 
-            verify(userRepository).findById(USER_ID);
-            verifyNoInteractions(userMapper);
-            verifyNoMoreInteractions(userRepository);
-        }
+           assertThatThrownBy(() -> userService.delete(USER_ID))
+                   .isInstanceOf(UserNotFoundException.class)
+                   .hasMessage("User with id: " + USER_ID + " not found");
 
-        @Test
-        void shouldThrowExceptionWhenDeactivatingNonExistingUser() {
-
-            when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> userService.deactivate(USER_ID))
-                    .isInstanceOf(UserNotFoundException.class)
-                    .hasMessage("User with id: " + USER_ID +  " not found");
-
-            verify(userRepository).findById(USER_ID);
-            verifyNoInteractions(userMapper);
-            verifyNoMoreInteractions(userRepository);
-        }
-    }
-
-    @Nested
-    class GetAllTests {
-
-        @Test
-        void shouldReturnUsersPage() {
-
-            Pageable pageable = PageRequest.of(0, 10);
-
-            Page<User> users = new PageImpl<>(List.of(user));
-
-            when(userRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(users);
-            when(userMapper.toResponse(user)).thenReturn(userResponse);
-
-            Page<UserResponse> result = userService.getAll(USER_NAME, USER_SURNAME, pageable);
-
-            assertThat(result).hasSize(1);
-            assertThat(result.getContent()).containsExactly(userResponse);
-
-            verify(userRepository).findAll(any(Specification.class), eq(pageable));
-            verify(userMapper).toResponse(user);
-            verifyNoMoreInteractions(userRepository, userMapper);
-        }
-    }
+           verify(userRepository).existsById(USER_ID);
+           verify(userRepository, never()).deleteById(anyLong());
+           verifyNoMoreInteractions(userRepository);
+           verifyNoInteractions(userMapper);
+       }
+   }
 
 }
