@@ -3,7 +3,7 @@ package com.innowise.userservice.exception;
 public class EmailAlreadyExistsException extends RuntimeException {
 
     public EmailAlreadyExistsException(String email) {
-        super("User with email: " + email + " already exists");
+        super("User with email: %s already exists".formatted(email));
     }
 
 }

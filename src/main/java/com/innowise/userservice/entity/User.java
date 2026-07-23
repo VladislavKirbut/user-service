@@ -2,6 +2,7 @@ package com.innowise.userservice.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -12,23 +13,23 @@ import java.util.List;
 @NoArgsConstructor
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 @Table(name = "users")
 public class User extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
+    @Column(nullable = false)
     private String name;
 
+    @Column(nullable = false)
     private String surname;
 
+    @Column(nullable = false)
     private LocalDate birthDate;
 
     @Column(nullable = false, unique = true)
     private String email;
 
+    @Column(nullable = false)
     @Builder.Default
     private Boolean active = true;
 
@@ -40,17 +41,16 @@ public class User extends BaseEntity {
     )
     private List<PaymentCard> paymentCards = new ArrayList<>();
 
-    public void addCard(PaymentCard card) {
-
-        if (!paymentCards.contains(card)) {
-            paymentCards.add(card);
-            card.setUser(this);
+    public void addPaymentCard(PaymentCard paymentCard) {
+        if (!paymentCards.contains(paymentCard)) {
+            paymentCards.add(paymentCard);
+            paymentCard.setUser(this);
         }
     }
 
-    public void removeCard(PaymentCard card) {
-        paymentCards.remove(card);
-        card.setUser(null);
+    public void removePaymentCard(PaymentCard paymentCard) {
+        paymentCards.remove(paymentCard);
+        paymentCard.setUser(null);
     }
 
 }

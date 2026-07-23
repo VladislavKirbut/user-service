@@ -11,3 +11,6 @@ CREATE TABLE users (
     created_at TIMESTAMP NOT NULL DEFAULT current_timestamp,
     updated_at TIMESTAMP NOT NULL DEFAULT current_timestamp
 );
+
+CREATE INDEX idx_users_name ON users(name);
+CREATE INDEX idx_users_surname ON users(surname);

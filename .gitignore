@@ -32,6 +32,7 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 
+.env
 HELP.md
 .gradle
 build/

@@ -4,27 +4,21 @@ import com.innowise.userservice.dto.request.CreateUserRequest;
 import com.innowise.userservice.dto.request.UpdateUserRequest;
 import com.innowise.userservice.entity.User;
 import com.innowise.userservice.integration.AbstractIntegrationTest;
-import com.innowise.userservice.repository.UserRepository;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-
 
 import java.time.LocalDate;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class UserIntegrationTest extends AbstractIntegrationTest {
 
-    @Autowired
-    private UserRepository userRepository;
-
     @Test
     void shouldCreateUserSuccessfully() throws Exception {
-
         CreateUserRequest request = CreateUserRequest.builder()
                 .name("John")
                 .surname("Smith")
@@ -54,28 +48,19 @@ class UserIntegrationTest extends AbstractIntegrationTest {
                         request.name(),
                         request.surname(),
                         request.email(),
-                        true
-                );
+                        true);
     }
 
     @Test
-    void shouldReturnConflictWhenEmailAlreadyExist() throws Exception {
-
-        User user = User.builder()
-                .name("Ivan")
-                .surname("Ivanov")
-                .email("ivan@test.com")
-                .birthDate(LocalDate.of(1998, 10, 5))
-                .active(true)
-                .build();
-
+    void shouldReturnConflictWhenEmailAlreadyExists() throws Exception {
+        User user = createUser("Ivan", "Ivanov", "ivan@test.com", true);
         userRepository.save(user);
 
         CreateUserRequest request = CreateUserRequest.builder()
                 .name("John")
                 .surname("Smith")
-                .email("jsmith@gmail.com")
-                .birthDate(LocalDate.of(2001, 1,5))
+                .email("ivan@test.com")
+                .birthDate(LocalDate.of(2001, 1, 5))
                 .build();
 
         mockMvc.perform(post("/api/v1/users")
@@ -83,23 +68,18 @@ class UserIntegrationTest extends AbstractIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict());
 
-        assertThat(userRepository.count()).isOne();
+        assertThat(userRepository.count()).isEqualTo(1);
     }
 
     @Test
     void shouldReturnUserById() throws Exception {
+        User savedUser = userRepository.save(
+                createUser("Ivan", "Ivanov", "ivan@test.com", true));
 
-        User user = User.builder()
-                .name("Ivan")
-                .surname("Ivanov")
-                .email("ivan@test.com")
-                .birthDate(LocalDate.of(1998, 10, 5))
-                .active(true)
-                .build();
+        String token = createAdminToken(savedUser.getId());
 
-        User savedUser = userRepository.save(user);
-
-        mockMvc.perform(get("/api/v1/users/{id}", savedUser.getId()))
+        mockMvc.perform(get("/api/v1/users/{id}", savedUser.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(savedUser.getId()))
                 .andExpect(jsonPath("$.name").value(savedUser.getName()))
@@ -109,21 +89,15 @@ class UserIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldReturnUsersWithPagination() throws Exception {
+        User user = userRepository.save(
+                createUser("Ivan", "Ivanov", "ivan@test.com", true));
 
-        User user = User.builder()
-                .name("Ivan")
-                .surname("Ivanov")
-                .email("ivan@test.com")
-                .birthDate(LocalDate.of(1998, 10, 5))
-                .active(true)
-                .build();
-
-        userRepository.save(user);
-
+        String token = createAdminToken(user.getId());
 
         mockMvc.perform(get("/api/v1/users")
                         .param("page", "0")
-                        .param("size", "10"))
+                        .param("size", "10")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.content.length()").value(1));
@@ -131,29 +105,17 @@ class UserIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldReturnUsersFilteredByName() throws Exception {
+        User user = userRepository.save(
+                createUser("Ivan", "Ivanov", "ivan@test.com", true));
 
-        User user = User.builder()
-                .name("Ivan")
-                .surname("Ivanov")
-                .email("ivan@test.com")
-                .birthDate(LocalDate.of(1998, 10, 5))
-                .active(true)
-                .build();
+        userRepository.save(
+                createUser("John", "Smith", "john@test.com", true));
 
-        userRepository.save(user);
+        String token = createAdminToken(user.getId());
 
-        User user1 = User.builder()
-                .name("John")
-                .surname("Smith")
-                .email("john@test.com")
-                .birthDate(LocalDate.of(1990,4,5))
-                .active(true)
-                .build();
-
-        userRepository.save(user1);
-
-
-        mockMvc.perform(get("/api/v1/users").param("name", "Ivan"))
+        mockMvc.perform(get("/api/v1/users")
+                        .param("name", "Ivan")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].name").value("Ivan"));
@@ -161,110 +123,101 @@ class UserIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldReturnUsersFilteredBySurname() throws Exception {
+        User user = userRepository.save(
+                createUser("Ivan", "Ivanov", "ivan@test.com", true));
 
-        User user = User.builder()
-                .name("Ivan")
-                .surname("Ivanov")
-                .email("ivan@test.com")
-                .birthDate(LocalDate.of(1998, 10, 5))
-                .active(true)
-                .build();
+        User user1 = userRepository.save(
+                createUser("John", "Smith", "john@test.com", true));
 
-        userRepository.save(user);
+        String token = createAdminToken(user.getId());
 
-        User user1 = User.builder()
-                .name("John")
-                .surname("Smith")
-                .email("john@test.com")
-                .birthDate(LocalDate.of(1990,4,5))
-                .active(true)
-                .build();
-
-        userRepository.save(user1);
-
-
-        mockMvc.perform(get("/api/v1/users").param("surname", "Smith"))
+        mockMvc.perform(get("/api/v1/users")
+                        .param("surname", "Smith")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
-                .andExpect(jsonPath("$.content[0].surname").value("Smith"));
+                .andExpect(jsonPath("$.content[0].surname").value(user1.getSurname()));
     }
 
     @Test
     void shouldUpdateUserSuccessfully() throws Exception {
-
-        User user = User.builder()
-                .name("Ivan")
-                .surname("Ivanov")
-                .email("ivan@test.com")
-                .birthDate(LocalDate.of(1998, 10, 5))
-                .active(true)
-                .build();
-
-        User savedUser = userRepository.save(user);
-
+        User savedUser = userRepository.save(
+                createUser("Ivan", "Ivanov", "ivan@test.com", true));
 
         UpdateUserRequest request = UpdateUserRequest.builder()
                 .name("John")
                 .surname("Smith")
-                .birthDate(LocalDate.of(1997,3,15))
+                .birthDate(LocalDate.of(1997, 3, 15))
                 .email("john@gmail.com")
                 .build();
 
+        String token = createAdminToken(savedUser.getId());
 
         mockMvc.perform(put("/api/v1/users/{id}", savedUser.getId())
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("John"))
-                .andExpect(jsonPath("$.surname").value("Smith"))
-                .andExpect(jsonPath("$.email").value("john@gmail.com"));
+                .andExpect(jsonPath("$.name").value(request.name()))
+                .andExpect(jsonPath("$.surname").value(request.surname()))
+                .andExpect(jsonPath("$.email").value(request.email()));
 
+        User updatedUser = userRepository.findById(savedUser.getId())
+                .orElseThrow();
 
-        User updatedUser = userRepository.findById(user.getId()).orElseThrow();
-
-        assertThat(updatedUser.getName()).isEqualTo("John");
+        assertThat(updatedUser.getName()).isEqualTo(request.name());
+        assertThat(updatedUser.getSurname()).isEqualTo(request.surname());
+        assertThat(updatedUser.getEmail()).isEqualTo(request.email());
     }
 
     @Test
     void shouldActivateUserSuccessfully() throws Exception {
+        User savedUser = userRepository.save(
+                createUser("Ivan", "Ivanov", "ivan@test.com", false));
 
-        User user = User.builder()
-                .name("Ivan")
-                .surname("Ivanov")
-                .email("ivan@test.com")
-                .birthDate(LocalDate.of(1998, 10, 5))
-                .active(true)
-                .build();
+        String token = createAdminToken(savedUser.getId());
 
-        User savedUser = userRepository.save(user);
-
-        mockMvc.perform(patch("/api/v1/users/{id}/activate", savedUser.getId()))
+        mockMvc.perform(patch("/api/v1/users/{id}", savedUser.getId())
+                        .param("active", "true")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isNoContent());
 
-        User updatedUser = userRepository.findById(savedUser.getId()).orElseThrow();
+        User updatedUser = userRepository.findById(savedUser.getId())
+                .orElseThrow();
 
         assertThat(updatedUser.getActive()).isTrue();
     }
 
     @Test
     void shouldDeactivateUserSuccessfully() throws Exception {
+        User savedUser = userRepository.save(
+                createUser("Ivan", "Ivanov", "ivan@test.com", true));
 
-        User user = User.builder()
-                .name("Ivan")
-                .surname("Ivanov")
-                .email("ivan@test.com")
-                .birthDate(LocalDate.of(1998, 10, 5))
-                .active(true)
-                .build();
+        String token = createAdminToken(savedUser.getId());
 
-        User savedUser = userRepository.save(user);
-
-        mockMvc.perform(patch("/api/v1/users/{id}/deactivate", savedUser.getId()))
+        mockMvc.perform(patch("/api/v1/users/{id}", savedUser.getId())
+                        .param("active", "false")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isNoContent());
 
-        User updatedUser = userRepository.findById(savedUser.getId()).orElseThrow();
+        User updatedUser = userRepository.findById(savedUser.getId())
+                .orElseThrow();
 
         assertThat(updatedUser.getActive()).isFalse();
     }
 
+    private User createUser(
+            String name,
+            String surname,
+            String email,
+            boolean active) {
+
+        return User.builder()
+                .name(name)
+                .surname(surname)
+                .email(email)
+                .birthDate(LocalDate.of(1998, 10, 5))
+                .active(active)
+                .build();
+    }
 }
