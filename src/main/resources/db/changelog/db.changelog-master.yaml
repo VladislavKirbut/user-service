@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/001_create_users_table.sql
+  - include:
+      file: db/changelog/002_create_payment_cards_table.sql
+  - include:
+      file: db/changelog/003_create_indexes.sql
