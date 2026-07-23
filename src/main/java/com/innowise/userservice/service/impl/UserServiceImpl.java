@@ -11,7 +11,10 @@ import com.innowise.userservice.mapper.UserMapper;
 import com.innowise.userservice.repository.UserRepository;
 import com.innowise.userservice.service.UserService;
 import com.innowise.userservice.specification.UserSpecification;
+import com.innowise.userservice.util.CacheNames;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -38,8 +41,9 @@ public class UserServiceImpl implements UserService {
         return userMapper.toResponse(userRepository.save(user));
     }
 
-    @Override
+    @Cacheable(value = CacheNames.USERS, key = "#id")
     @Transactional(readOnly = true)
+    @Override
     public UserDetailsResponse getById(Long id) {
         User user = userRepository.findWithPaymentCardsById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
@@ -60,8 +64,9 @@ public class UserServiceImpl implements UserService {
         return users.map(userMapper::toResponse);
     }
 
-    @Override
+    @CacheEvict(value = CacheNames.USERS, key = "#id")
     @Transactional
+    @Override
     public UserResponse update(Long id, UpdateUserRequest request) {
 
         User user = userRepository.findById(id)
@@ -76,8 +81,9 @@ public class UserServiceImpl implements UserService {
         return userMapper.toResponse(user);
     }
 
-    @Override
+    @CacheEvict(value = CacheNames.USERS, key = "#id")
     @Transactional
+    @Override
     public void activate(Long id) {
 
         User user = userRepository.findById(id)
@@ -86,8 +92,9 @@ public class UserServiceImpl implements UserService {
         user.setActive(true);
     }
 
-    @Override
+    @CacheEvict(value = CacheNames.USERS, key = "#id")
     @Transactional
+    @Override
     public void deactivate(Long id) {
 
         User user = userRepository.findById(id)
