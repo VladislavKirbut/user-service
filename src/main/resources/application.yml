@@ -17,6 +17,17 @@ spring:
     show-sql: true
     open-in-view: false
 
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 10m
+      cache-null-values: false
+
 logging:
   level:
     org.hibernate.SQL: DEBUG
