@@ -6,19 +6,24 @@ import com.innowise.userservice.dto.response.PaymentCardResponse;
 import com.innowise.userservice.entity.PaymentCard;
 import com.innowise.userservice.entity.User;
 import com.innowise.userservice.exception.CardLimitExceededException;
+import com.innowise.userservice.exception.PaymentCardAlreadyExistsException;
 import com.innowise.userservice.exception.PaymentCardNotFoundException;
 import com.innowise.userservice.exception.UserNotFoundException;
 import com.innowise.userservice.mapper.PaymentCardMapper;
 import com.innowise.userservice.repository.PaymentCardRepository;
 import com.innowise.userservice.repository.UserRepository;
 import com.innowise.userservice.service.PaymentCardService;
+import com.innowise.userservice.util.CacheNames;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.CacheManager;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +35,8 @@ public class PaymentCardServiceImpl implements PaymentCardService {
     private final UserRepository userRepository;
     private final PaymentCardMapper paymentCardMapper;
 
+    private final CacheManager cacheManager;
+
     @Override
     @Transactional
     public PaymentCardResponse create(Long userId, CreatePaymentCardRequest request) {
@@ -37,7 +44,7 @@ public class PaymentCardServiceImpl implements PaymentCardService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
-        if (paymentCardRepository.countByUserIdAndActiveTrue(user.getId()) >= MAX_CARDS_PER_USER) {
+        if (paymentCardRepository.countByUserId(user.getId()) >= MAX_CARDS_PER_USER) {
             throw new CardLimitExceededException(user.getId());
         }
 
@@ -45,7 +52,15 @@ public class PaymentCardServiceImpl implements PaymentCardService {
 
         user.addCard(paymentCard);
 
-        return paymentCardMapper.toResponse(paymentCardRepository.save(paymentCard));
+        try {
+            PaymentCard savedCard = paymentCardRepository.save(paymentCard);
+
+            evictUserCache(userId);
+
+            return paymentCardMapper.toResponse(savedCard);
+        } catch (DataIntegrityViolationException ex) {
+            throw new PaymentCardAlreadyExistsException(request.number());
+        }
     }
 
     @Override
@@ -89,6 +104,8 @@ public class PaymentCardServiceImpl implements PaymentCardService {
 
         paymentCardMapper.updateEntity(request, paymentCard);
 
+        evictUserCache(paymentCard.getUser().getId());
+
         return paymentCardMapper.toResponse(paymentCard);
     }
 
@@ -100,6 +117,8 @@ public class PaymentCardServiceImpl implements PaymentCardService {
                 .orElseThrow(() -> new PaymentCardNotFoundException(id));
 
         paymentCard.setActive(true);
+
+        evictUserCache(paymentCard.getUser().getId());
     }
 
     @Override
@@ -110,6 +129,14 @@ public class PaymentCardServiceImpl implements PaymentCardService {
                 .orElseThrow(() -> new PaymentCardNotFoundException(id));
 
         paymentCard.setActive(false);
+
+        evictUserCache(paymentCard.getUser().getId());
+    }
+
+    private void evictUserCache(Long userId) {
+
+        Objects.requireNonNull(cacheManager.getCache(CacheNames.USERS))
+                .evict(userId);
     }
 
 }

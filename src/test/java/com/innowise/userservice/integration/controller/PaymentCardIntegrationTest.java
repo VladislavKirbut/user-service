@@ -10,6 +10,8 @@ import org.springframework.http.MediaType;
 
 import java.time.LocalDate;
 
+import static com.innowise.userservice.testdata.PaymentCardTestConstants.CARD_HOLDER;
+import static com.innowise.userservice.testdata.PaymentCardTestConstants.CARD_NUMBER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -34,8 +36,8 @@ class PaymentCardIntegrationTest extends AbstractIntegrationTest {
 
         return paymentCardRepository.save(
                 PaymentCard.builder()
-                        .number("1111111111111111")
-                        .holder("IVAN IVANOV")
+                        .number(CARD_NUMBER)
+                        .holder(CARD_HOLDER)
                         .expirationDate(LocalDate.of(2030, 10, 1))
                         .active(true)
                         .user(user)
@@ -49,8 +51,8 @@ class PaymentCardIntegrationTest extends AbstractIntegrationTest {
         User user = createUser();
 
         CreatePaymentCardRequest request = CreatePaymentCardRequest.builder()
-                        .number("1111111111111111")
-                        .holder("IVAN IVANOV")
+                        .number(CARD_NUMBER)
+                        .holder(CARD_HOLDER)
                         .expirationDate(LocalDate.of(2030, 10, 1))
                         .build();
 
@@ -58,8 +60,8 @@ class PaymentCardIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.number").value("1111222233334444"))
-                .andExpect(jsonPath("$.holder").value("IVAN IVANOV"));
+                .andExpect(jsonPath("$.number").value(request.number()))
+                .andExpect(jsonPath("$.holder").value(request.holder()));
 
         assertThat(paymentCardRepository.count()).isEqualTo(1);
     }
@@ -68,8 +70,8 @@ class PaymentCardIntegrationTest extends AbstractIntegrationTest {
     void shouldReturnNotFoundWhenUserDoesNotExist() throws Exception {
 
         CreatePaymentCardRequest request = CreatePaymentCardRequest.builder()
-                        .number("1111111111111111")
-                        .holder("IVAN IVANOV")
+                        .number(CARD_NUMBER)
+                        .holder(CARD_HOLDER)
                         .expirationDate(LocalDate.of(2030,10,1))
                         .build();
 
@@ -90,7 +92,9 @@ class PaymentCardIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/cards/{id}", card.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(card.getId()))
-                .andExpect(jsonPath("$.number").value(card.getNumber()));
+                .andExpect(jsonPath("$.number").value(card.getNumber()))
+                .andExpect(jsonPath("$.holder").value(card.getHolder()))
+                .andExpect(jsonPath("$.active").value(true));
 
     }
 
@@ -99,12 +103,13 @@ class PaymentCardIntegrationTest extends AbstractIntegrationTest {
 
         User user = createUser();
 
-        createCard(user);
+        PaymentCard card = createCard(user);
 
         mockMvc.perform(get("/api/v1/users/{userId}/cards", user.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].holder").value("IVAN IVANOV"));
+                .andExpect(jsonPath("$[0].number").value(card.getNumber()))
+                .andExpect(jsonPath("$[0].holder").value(card.getHolder()));
     }
 
     @Test
@@ -118,7 +123,8 @@ class PaymentCardIntegrationTest extends AbstractIntegrationTest {
                         .param("page","0")
                         .param("size","10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(1));
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.totalElements").value(1));
 
     }
 
@@ -130,6 +136,7 @@ class PaymentCardIntegrationTest extends AbstractIntegrationTest {
         PaymentCard card = createCard(user);
 
         UpdatePaymentCardRequest request = UpdatePaymentCardRequest.builder()
+                        .number(CARD_NUMBER)
                         .holder("NEW HOLDER")
                         .expirationDate(LocalDate.of(2035,1,1))
                         .build();
@@ -138,11 +145,11 @@ class PaymentCardIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.holder").value("NEW HOLDER"));
+                .andExpect(jsonPath("$.holder").value(request.holder()));
 
         PaymentCard updated = paymentCardRepository.findById(card.getId()).orElseThrow();
 
-        assertThat(updated.getHolder()).isEqualTo("NEW HOLDER");
+        assertThat(updated.getHolder()).isEqualTo(request.holder());
     }
 
     @Test
@@ -154,8 +161,7 @@ class PaymentCardIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(
                         patch("/api/v1/cards/{id}/deactivate", card.getId())
-                )
-                .andExpect(status().isNoContent());
+                ).andExpect(status().isNoContent());
 
         PaymentCard updated = paymentCardRepository.findById(card.getId()).orElseThrow();
 
@@ -174,8 +180,7 @@ class PaymentCardIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(
                         patch("/api/v1/cards/{id}/activate", card.getId())
-                )
-                .andExpect(status().isNoContent());
+                ).andExpect(status().isNoContent());
 
         PaymentCard updated = paymentCardRepository.findById(card.getId()).orElseThrow();
 
@@ -191,7 +196,7 @@ class PaymentCardIntegrationTest extends AbstractIntegrationTest {
         for (int i = 0; i < 5; i++) {
 
             PaymentCard card = PaymentCard.builder()
-                    .number("11112222333344" + i)
+                    .number("111122223333444" + i)
                     .holder("USER")
                     .expirationDate(LocalDate.of(2030,1,1))
                     .active(true)
@@ -202,7 +207,7 @@ class PaymentCardIntegrationTest extends AbstractIntegrationTest {
         }
 
         CreatePaymentCardRequest request = CreatePaymentCardRequest.builder()
-                        .number("9999888877776666")
+                        .number(CARD_NUMBER)
                         .holder("NEW")
                         .expirationDate(LocalDate.of(2030,1,1))
                         .build();

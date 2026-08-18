@@ -13,6 +13,8 @@ public interface UserService {
 
     UserDetailsResponse getById(Long id);
 
+    UserResponse getByEmail(String email);
+
     UserResponse update(Long id, UpdateUserRequest request);
 
     Page<UserResponse> getAll(String name, String surname, Pageable pageable);

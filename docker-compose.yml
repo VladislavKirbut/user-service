@@ -20,7 +20,7 @@ services:
       - postgres
       - redis
     env_file:
-      - ../Credentials.env
+      - .env
     environment:
       SPRING_PROFILES_ACTIVE: docker
     ports:

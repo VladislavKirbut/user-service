@@ -10,7 +10,7 @@ import java.time.LocalDate;
 public record UpdateUserRequest(
 
         @NotBlank(message = "Name cannot be blank")
-        @Size(max = 100, message = "Name length must not exceed 50 characters")
+        @Size(max = 100, message = "Name length must not exceed 100 characters")
         String name,
 
         @NotBlank(message = "Surname cannot be blank")

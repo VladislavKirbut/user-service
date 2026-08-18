@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
-
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.*;
@@ -18,9 +17,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class UserIntegrationTest extends AbstractIntegrationTest {
-
-    @Autowired
-    private UserRepository userRepository;
 
     @Test
     void shouldCreateUserSuccessfully() throws Exception {
@@ -156,7 +152,7 @@ class UserIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/users").param("name", "Ivan"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
-                .andExpect(jsonPath("$.content[0].name").value("Ivan"));
+                .andExpect(jsonPath("$.content[0].name").value(user.getName()));
     }
 
     @Test
@@ -186,7 +182,7 @@ class UserIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/users").param("surname", "Smith"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
-                .andExpect(jsonPath("$.content[0].surname").value("Smith"));
+                .andExpect(jsonPath("$.content[0].surname").value(user1.getName()));
     }
 
     @Test
@@ -215,14 +211,14 @@ class UserIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("John"))
-                .andExpect(jsonPath("$.surname").value("Smith"))
-                .andExpect(jsonPath("$.email").value("john@gmail.com"));
+                .andExpect(jsonPath("$.name").value(request.name()))
+                .andExpect(jsonPath("$.surname").value(request.surname()))
+                .andExpect(jsonPath("$.email").value(request.email()));
 
 
         User updatedUser = userRepository.findById(user.getId()).orElseThrow();
 
-        assertThat(updatedUser.getName()).isEqualTo("John");
+        assertThat(updatedUser.getName()).isEqualTo(request.name());
     }
 
     @Test
