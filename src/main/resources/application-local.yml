@@ -1,0 +1,30 @@
+server:
+  port: ${USER_SERVICE_PORT}
+
+spring:
+  config:
+    activate:
+      on-profile: local
+
+  datasource:
+    url: jdbc:postgresql://${USER_SERVICE_DB_HOST}:${USER_SERVICE_DB_PORT}/${USER_SERVICE_DB_NAME}
+    username: ${USER_SERVICE_DB_USERNAME}
+    password: ${USER_SERVICE_DB_PASSWORD}
+
+  jpa:
+    show-sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ${REDIS_PASSWORD}
+      entity-ttl: 60
+
+jwt:
+  secret: ${JWT_SECRET}
+  issuer: ${JWT_ISSUER}
+
+logging:
+  level:
+    root: INFO
